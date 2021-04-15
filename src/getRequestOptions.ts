@@ -51,7 +51,7 @@ export function getRequestOptions({
   parameterDetails.forEach(({ name, swaggerName, type, required }) => {
     const value = parameterValues[name];
 
-    if (required && !value && value !== '')
+    if (required && !value && value !== '' && value !== 0 && value !== false)
       throw new Error(
         `No required request field ${name} for ${method.toUpperCase()} ${path}`,
       );

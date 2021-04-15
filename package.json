@@ -1,5 +1,5 @@
 {
-  "name": "swagger-to-graphql",
+  "name": "swagger-to-graphql-ex",
   "version": "4.0.2",
   "author": "Roman Krivtsov",
   "repository": {
@@ -72,5 +72,8 @@
     "test": "TS_NODE_COMPILER=ttypescript mocha",
     "test:watch": "npm run test -- --watch",
     "example": "ts-node example/app"
+  },
+  "publishConfig": {
+    "registry": "http://192.168.100.208:8081/repository/npm-forks/"
   }
 }

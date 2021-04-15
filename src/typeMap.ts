@@ -172,6 +172,7 @@ export const createGraphQLType = (
   gqlTypes: GraphQLTypeMap,
 ): GraphQLType => {
   title = (jsonSchema && jsonSchema.title) || title;
+  gqlTypes.__namespace__ && (title = gqlTypes.__namespace__ + '_' + title);
   title = makeValidName(title);
 
   if (isInputType && !title.endsWith('Input')) {

@@ -90,28 +90,40 @@ const schemaFromEndpoints = <TContext>(
   options: Options<TContext>,
 ): GraphQLSchema => {
   const gqlTypes = {};
-  const queryFields = getFields(endpoints, false, gqlTypes, options);
-  if (!Object.keys(queryFields).length) {
-    throw new Error('Did not find any GET endpoints');
-  }
+  const schema = schemaFromEndpointsEx(endpoints, options, gqlTypes);
+
   const rootType = new GraphQLObjectType({
     name: 'Query',
-    fields: queryFields,
+    fields: schema.query,
   });
 
   const graphQLSchema: RootGraphQLSchema = {
     query: rootType,
   };
 
-  const mutationFields = getFields(endpoints, true, gqlTypes, options);
-  if (Object.keys(mutationFields).length) {
+  if (Object.keys(schema.mutation).length) {
     graphQLSchema.mutation = new GraphQLObjectType({
       name: 'Mutation',
-      fields: mutationFields,
+      fields: schema.mutation,
     });
   }
 
   return new GraphQLSchema(graphQLSchema);
+};
+
+const schemaFromEndpointsEx = <TContext>(
+  endpoints: Endpoints,
+  options: Options<TContext>,
+  gqlTypes: any,
+) => {
+  const queryFields = getFields(endpoints, false, gqlTypes, options);
+  if (!Object.keys(queryFields).length) {
+    throw new Error('Did not find any GET endpoints');
+  }
+  return {
+    query: queryFields,
+    mutation: getFields(endpoints, true, gqlTypes, options)
+  };
 };
 
 export { RequestOptions, JSONSchema };
@@ -135,6 +147,62 @@ export const createSchema = async <TContext>(
   const swaggerSchema = addTitlesToJsonSchemas(schemaWithoutReferences);
   const endpoints = getAllEndPoints(swaggerSchema);
   return schemaFromEndpoints(endpoints, options);
+};
+
+export interface Namespaces {
+  [typeName: string]: string | JSONSchema;
+}
+export interface JoinOptions<TContext> {
+  swaggerSchema: Namespaces;
+  callBackend: (args: CallBackendArguments<TContext>) => Promise<any>;
+}
+
+export const joinNCreateSchema = async <TContext>(
+  options: JoinOptions<TContext>,
+): Promise<GraphQLSchema> => {
+  const namespaces = options.swaggerSchema;
+  const gqlSchema: any = { query: {}, mutation: {} };
+  for (let namespace in namespaces) {
+		const schemaWithoutReferences = (await refParser.dereference(
+      namespaces[namespace],
+    )) as SwaggerSchema;
+    const swaggerSchema = addTitlesToJsonSchemas(schemaWithoutReferences);
+    const endpoints = getAllEndPoints(swaggerSchema);
+    const gqlTypes = { __namespace__: namespace };
+    const endpointSchema = schemaFromEndpointsEx(endpoints, options, gqlTypes);
+    gqlSchema.query[namespace] = {
+			type: new GraphQLObjectType({
+				name: namespace,
+				fields: endpointSchema.query
+			}),
+			resolve: () => 'Without this resolver graphql does not resolve further'
+		};
+		gqlSchema.mutation[namespace] = {
+			type: new GraphQLObjectType({
+				name: namespace + '_mutation',
+				fields: endpointSchema.mutation
+			}),
+			resolve: () => 'Without this resolver graphql does not resolve further'
+		}
+	}
+
+  const rootType = new GraphQLObjectType({
+		name: 'Query',
+		fields: gqlSchema.query
+	});
+
+	const graphQLSchema: RootGraphQLSchema = {
+		query: rootType
+	};
+
+	if (Object.keys(gqlSchema.mutation).length) {
+		graphQLSchema.mutation = new GraphQLObjectType({
+			name: 'Mutation',
+			fields: gqlSchema.mutation
+		});
+	}
+
+	return new GraphQLSchema(graphQLSchema);
 };
 
 export default createSchema;
